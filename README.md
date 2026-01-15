@@ -1,203 +1,183 @@
-# Projeto Baby Fraud Detector 👶🕵️
+# DetectFraud-prt
 
-Bem-vindo ao seu projeto de detecção de fraudes IEEE-CIS explicado como se você fosse um bebê curioso. Cada etapa diz o que faz, por que faz e como não tropeçar.
+Projeto de detecção de fraudes em transações desenvolvido para um desafio técnico, utilizando um conjunto de dados disponibilizado pela organização do desafio (no formato típico de transações + identidade). O foco aqui é entregar um pipeline completo: preparação dos dados, treino supervisionado, seleção de limiar (threshold), avaliação, predição em lote e disponibilização via API e dashboard.
 
-## Visão geral simples
+## Objetivo
 
-1. **Dados**: baixamos os arquivos do Kaggle e juntamos `train_transaction` com `train_identity` usando `TransactionID`. Treino e teste ficam em `data/processed/` prontinhos.
-2. **Pré-processamento**: preenchemos valores ausentes (números viram 0, categorias viram "missing"), reduzimos o tamanho dos números (downcast) e salvamos em Parquet para economizar memória.
-3. **Modelo supervisionado**: CatBoost aprende com as transações rotuladas (`isFraud`) usando pesos automáticos para lidar com o desbalanceamento (muito mais transações normais do que fraudulentas).
-4. **Threshold inteligente**: em vez do padrão 0.5, testamos vários limiares e escolhemos o que dá melhor F1 na curva Precisão-Recall.
-5. **Avaliação**: medimos Precisão, Recall, F1, ROC AUC e PR AUC. Geramos matriz de confusão e curva PR para enxergar os trade-offs.
-6. **Predição**: um script confere se o novo CSV tem as mesmas colunas e devolve `fraud_proba` e `fraud_flag`.
-7. **Dashboard**: Streamlit permite subir um CSV, ajustar o threshold com slider e baixar os resultados.
-8. **API**: FastAPI recebe registros via JSON e devolve probabilidades.
-9. **Explainability**: calculamos SHAP em uma amostra pequena para entender quais colunas empurram a decisão.
+- Estimar a probabilidade de fraude por transação.
+- Controlar o trade-off entre recall e precisão via threshold configurável.
+- Entregar um fluxo reprodutível (config central + artefatos de modelo) e pontos de consumo (FastAPI/Streamlit).
 
-## Estrutura de pastas
+## Principais componentes
+
+- Processamento e merge dos dados de transação/identidade por chave (ex.: `TransactionID`).
+- Treino supervisionado com CatBoost (bom desempenho em dados tabulares e suporte a variáveis categóricas).
+- Seleção automática de threshold baseada em métrica configurável (padrão: F1).
+- Relatórios em `reports/` (métricas e gráficos) e artefatos em `models/`.
+- Consumo do modelo:
+	- API (FastAPI) para predição via JSON.
+	- Dashboard (Streamlit) para upload de CSV e download do resultado.
+
+## Estrutura do projeto
 
 ```
+.
 ├── data/
-│   ├── raw/                # CSVs originais do Kaggle (depois do download)
-│   └── processed/          # Arquivos prontos para treino/predição (Parquet ou CSV fallback)
-├── models/                 # catboost_model.cbm + artifacts.json + modelos extras
-├── reports/                # Métricas em JSON e gráficos (confusão, PR, SHAP)
+│   ├── raw/                      # Dados brutos (não versionados quando grandes)
+│   └── processed/                # Dados processados para treino/predição
+├── models/                       # Modelo e artefatos (ex.: catboost_model.cbm, artifacts.json)
+├── reports/                      # Métricas e gráficos gerados no treino
 ├── src/
-│   ├── config/config.yaml  # Parâmetros centrais do projeto
-│   ├── data/load_merge_ieee.py
-│   ├── models/
-│   │   ├── train_supervised.py
-│   │   ├── evaluate.py
-│   │   ├── predict.py
-│   │   └── train_unsupervised.py
-│   └── utils/metrics.py
-├── app_streamlit.py
-├── api_fastapi.py
-├── pred_template.csv       # Cabeçalhos corretos para predição
+│   ├── config/config.yaml        # Configuração central do pipeline
+│   ├── data/load_merge_ieee.py   # Merge e preparação
+│   ├── models/                   # Treino/avaliação/predição
+│   └── utils/                    # Métricas e utilitários
+├── api_fastapi.py                # API de predição
+├── app_streamlit.py              # Dashboard interativo
+├── pred_template.csv             # Template de colunas para predição
 ├── requirements.txt
-├── Makefile
-├── .env.example
-└── README.md
+└── Makefile
 ```
 
-## Setup passo a passo (super detalhado)
+## Requisitos
 
-### 1. Clonar o projeto
+- Python 3.10+ (recomendado)
 
-```bash
-# Linux/macOS
-git clone <url-do-repo>
-cd DetectFraud-prod
-```
+## Instalação
 
-```powershell
-# Windows PowerShell
-git clone <url-do-repo>
-cd DetectFraud-prod
-```
+Crie e ative um ambiente virtual:
 
-### 2. Criar ambiente virtual
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
+Windows (PowerShell):
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-```
-
-### 3. Instalar dependências
-
-```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-```powershell
+Linux/macOS:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Configurar Kaggle CLI
+## Dados
 
-1. Crie token em https://www.kaggle.com/account (botão "Create New API Token").
-2. Copie `.env.example` para `.env` e preencha `KAGGLE_USERNAME` e `KAGGLE_KEY`.
-3. Execute:
+Por padrão, o pipeline espera os arquivos brutos em `data/raw/` com os nomes definidos em `src/config/config.yaml` (ex.: `train_transaction.csv`, `train_identity.csv`, `test_transaction.csv`, `test_identity.csv`).
 
-```bash
-export $(cat .env | xargs)
-kaggle competitions download -c ieee-fraud-detection -p data/raw
-unzip data/raw/ieee-fraud-detection.zip -d data/raw
-```
+Importante:
 
-```powershell
-Get-Content .env | ForEach-Object { if ($_ -match "^") { $name,$value = $_.Split('='); Set-Item -Path Env:$name -Value $value } }
-kaggle competitions download -c ieee-fraud-detection -p data/raw
-Expand-Archive data/raw/ieee-fraud-detection.zip -DestinationPath data/raw
-```
+- Arquivos muito grandes não são enviados ao GitHub (limite de 100MB por arquivo). Este repositório já possui um `.gitignore` para evitar versionar bases brutas gigantes e ambientes virtuais.
+- Se você precisar versionar arquivos grandes (por exemplo `.parquet`), o recomendado é usar Git LFS.
 
-### 5. Processar dados
+## Como executar
+
+### 1) Processar/merge dos dados
 
 ```bash
 python -m src.data.load_merge_ieee --config src/config/config.yaml
 ```
 
-### 6. Treinar modelo supervisionado
+Saída esperada (configurável):
+
+- `data/processed/train_merged.parquet`
+- `data/processed/test_merged.parquet`
+- Resumos JSON com colunas/categorias
+
+### 2) Treinar o modelo supervisionado
 
 ```bash
 python -m src.models.train_supervised --config src/config/config.yaml
 ```
 
-Isso gera:
+Artefatos gerados:
+
 - `models/catboost_model.cbm`
-- `models/artifacts.json` (features, threshold, métricas)
-- Gráficos em `reports/`
+- `models/artifacts.json` (features, colunas categóricas, threshold escolhido, métricas, parâmetros)
+- `reports/metrics.json`
+- Imagens em `reports/` (matriz de confusão, curva Precisão-Recall, SHAP)
 
-### 7. Avaliar (opcional, se tiver conjunto de validação rotulado)
+### 3) Predição em lote (CSV)
 
-```bash
-python -m src.models.evaluate --config src/config/config.yaml --dataset data/processed/train_merged.parquet
-```
-
-### 8. Predizer em novo CSV
+Use `pred_template.csv` como referência de cabeçalhos.
 
 ```bash
-python -m src.models.predict --config src/config/config.yaml --input caminho/para/novo.csv --output saida.csv
+python -m src.models.predict --config src/config/config.yaml --input caminho/para/entrada.csv --output saida.csv
 ```
 
-Use `pred_template.csv` para garantir o cabeçalho correto.
+O resultado inclui:
 
-### 9. Abrir dashboard Streamlit
+- `fraud_proba`: probabilidade estimada
+- `fraud_flag`: classificação binária usando o threshold salvo em `models/artifacts.json`
+
+## Dashboard (Streamlit)
 
 ```bash
 streamlit run app_streamlit.py
 ```
 
-### 10. Subir API FastAPI (modo desenvolvimento)
+O dashboard permite:
+
+- Upload de CSV
+- Ajuste de threshold em tempo real
+- Download do CSV com `fraud_proba` e `fraud_flag`
+
+## API (FastAPI)
+
+Suba a API em modo desenvolvimento:
 
 ```bash
 uvicorn api_fastapi:app --reload
 ```
 
-Endpoint principal: `POST /predict` com JSON no formato `{ "registros": [ {...}, {...} ] }`
+Endpoints:
 
-### 11. Modelo não supervisionado (opcional)
+- `GET /health` → status
+- `POST /predict` → predição
 
-```bash
-python -m src.models.train_unsupervised --config src/config/config.yaml
+Formato do payload:
+
+```json
+{
+	"registros": [
+		{"coluna1": 123, "coluna2": "abc"},
+		{"coluna1": 456, "coluna2": "def"}
+	]
+}
 ```
 
-## Explicações de bebê
-
-### Por que o dataset é desbalanceado?
-A base IEEE-CIS tem **muito mais transações normais** do que fraudes. É assim na vida real: só uma partezinha é fraude. Se treinarmos sem cuidado, o modelo aprende a dizer "não é fraude" sempre e parece ter alta acurácia, mas isso é inútil. Usamos `class_weights` automáticos no CatBoost para dar mais peso às fraudes. Outra opção seria SMOTE, mas ele cria dados sintéticos e pode ficar pesado aqui. Comece com class weights (mais simples e estável) e só teste SMOTE se precisar.
-
-### Por que PR AUC e Recall importam mais que Acurácia?
-- **Recall** diz quantas fraudes reais você achou. Se for baixo, o banco perde dinheiro.
-- **Precisão** diz quantos dos alertas eram fraudes de verdade.
-- **PR AUC** (área sob curva Precisão-Recall) combina os dois e é robusta em datasets desbalanceados. Acurácia pode enganar: acertar 99% das transações normais não significa detectar fraudes.
-
-### Problemas comuns e soluções
-- **Memória insuficiente**: use Parquet (menor) e downcast (números ocupam menos). Se travar, processe em chunks (pode adaptar `load_merge_ieee.py`).
-- **Sem credenciais do Kaggle**: sem arquivo `kaggle.json` configurado (ou `.env`), o download falha. Veja seção de setup.
-- **Colunas divergentes**: se o CSV novo não tem todas as colunas do treino, `predict.py` avisa exatamente quais faltam. Preencha ou remova com as mesmas transformações do preprocessamento.
-
-### O que funciona bem
-- **CatBoost** lida com categorias grandes sem precisar de one-hot (evita explosão de memória).
-- **Threshold customizado** mantém o trade-off calibrado para seu negócio.
-- **Métricas certas (PR AUC, Recall)** mostram desempenho real em fraudes.
-
-### O que evitar
-- **One-hot massivo**: IEEE-CIS tem centenas de colunas, one-hot vira desastre de memória.
-- **Acurácia como métrica principal**: não mede fraude direito.
-- **Threshold 0.5 fixo**: quase nunca otimiza Recall em datasets desbalanceados. Sempre olhe a curva PR.
-
-## Explainability (SHAP)
-Após o treino, olhe `reports/shap_summary.png`. Ele mostra as colunas que mais empurram a probabilidade de fraude (cores vermelhas ou azuis indicando valores altos/baixos). Use isso para explicar aos times de risco por que certas transações foram marcadas.
-
-## Makefile: atalhos úteis
+## Atalhos via Makefile
 
 ```bash
-make process        # roda merge + preprocessamento
-make train          # treina CatBoost
-make eval           # reavalia com dados rotulados
-make predict INPUT=data/processed/test_merged.parquet OUTPUT=pred.csv
-make app            # inicia Streamlit
-make api            # inicia FastAPI
+make setup
+make process
+make train
+make eval
+make predict INPUT=caminho/para/arquivo.csv OUTPUT=pred.csv
+make app
+make api
 ```
 
-No Windows, use `make` via Git Bash ou rode os comandos Python equivalentes manualmente.
+No Windows, se `make` não estiver disponível, rode os comandos Python diretamente.
 
-## Checklist pós-instalação
+## Configuração e reprodutibilidade
 
-- [ ] Ambiente virtual criado e `pip install -r requirements.txt` ok.
-- [ ] Dados do Kaggle baixados em `data/raw/`.
-- [ ] `python -m src.data.load_merge_ieee` executado sem erros.
-- [ ] Arquivos `models/catboost_model.cbm` e `models/artifacts.json` gerados.
-- [ ] Gráficos em `reports/` (confusão, PR, SHAP) disponíveis.
-- [ ] `pred_template.csv` usado como referência para novos dados.
-- [ ] Dashboard `streamlit run app_streamlit.py` abre sem reclamações.
-- [ ] API `uvicorn api_fastapi:app --reload` responde `GET /health` com `{ "status": "ok" }`.
+Os principais parâmetros do pipeline ficam em `src/config/config.yaml`:
+
+- Caminhos de entrada/saída
+- Estratégias de preprocessamento (ex.: preenchimento de missing, downcast)
+- Hiperparâmetros do CatBoost
+- Métrica para seleção de threshold
+- Configuração de explicabilidade (SHAP)
+
+## Observações
+
+- Este repositório não deve conter dados sensíveis ou identificáveis. Use sempre dados anonimizados/permitidos pela organização do desafio.
+- Se você quiser deixar o repositório mais “leve”, a melhor prática é manter apenas código/config/artefatos essenciais e armazenar datasets/arquivos grandes fora do Git (ou via Git LFS).
 
 ## Troubleshooting rápido
 
