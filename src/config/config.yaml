@@ -1,0 +1,61 @@
+# Caminhos principais
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  merged_train: "data/processed/train_merged.parquet"
+  merged_test: "data/processed/test_merged.parquet"
+  reports_dir: "reports"
+  models_dir: "models"
+  model_file: "models/catboost_model.cbm"
+  artifacts_file: "models/artifacts.json"
+  metrics_report: "reports/metrics.json"
+  confusion_matrix_png: "reports/confusion_matrix.png"
+  pr_curve_png: "reports/precision_recall_curve.png"
+
+# Informações do dataset
+ieee_dataset:
+  transaction_file: "train_transaction.csv"
+  identity_file: "train_identity.csv"
+  test_transaction_file: "test_transaction.csv"
+  test_identity_file: "test_identity.csv"
+  index_column: "TransactionID"
+  target_column: "isFraud"
+
+# Configurações de preprocessamento
+preprocessing:
+  enable_downcast: true
+  parquet_fallback_to_csv: true
+  parquet_engine: "pyarrow"
+  missing_fill_strategy:
+    numeric: 0.0
+    categorical: "missing"
+  categorical_cols_manual: []  # opcional: lista de colunas categóricas fixas
+  drop_columns: []             # opcional: colunas problemáticas para remover
+  test_size: 0.2
+  random_state: 42
+
+# Hiperparâmetros do CatBoost
+model:
+  type: "catboost"
+  params:
+    iterations: 1000
+    depth: 6
+    learning_rate: 0.06
+    loss_function: "Logloss"
+    eval_metric: "AUC"
+    random_seed: 42
+    verbose: 100
+    early_stopping_rounds: 50
+  class_weight_strategy: "auto"  # auto | manual
+  manual_class_weights: []        # exemplo: [1.0, 50.0]
+
+# Métrica para seleção de threshold
+thresholding:
+  metric: "f1"  # outras opções disponíveis em src/utils/metrics.py
+  default_threshold: 0.5         # usado como valor de fallback
+
+# Configurações de SHAP para explicabilidade
+explainability:
+  sample_size: 2000
+  random_state: 42
+  output_summary_png: "reports/shap_summary.png"

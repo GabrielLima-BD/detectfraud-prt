@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Training outputs
+catboost_info/
+
+# Large raw datasets (GitHub blocks files > 100MB)
+Dados/train_*.csv
+Dados/test_*.csv
+data/raw/train_*.csv
+data/raw/test_*.csv
+
+# Optional: keep sample submissions/templates tracked
+!Dados/sample_submission.csv
+!data/raw/sample_submission.csv
