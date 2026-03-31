@@ -23,7 +23,7 @@ Projeto de detecção de fraudes em transações desenvolvido para um desafio t�
 ```
 .
 ├── data/
-│   ├── raw/                      # Dados brutos (não versionados quando grandes)
+│   ├── raw/                      # Dados brutos 
 │   └── processed/                # Dados processados para treino/predição
 ├── models/                       # Modelo e artefatos (ex.: catboost_model.cbm, artifacts.json)
 ├── reports/                      # Métricas e gráficos gerados no treino
@@ -68,11 +68,6 @@ pip install -r requirements.txt
 ## Dados
 
 Por padrão, o pipeline espera os arquivos brutos em `data/raw/` com os nomes definidos em `src/config/config.yaml` (ex.: `train_transaction.csv`, `train_identity.csv`, `test_transaction.csv`, `test_identity.csv`).
-
-Importante:
-
-- Arquivos muito grandes não são enviados ao GitHub (limite de 100MB por arquivo). Este repositório já possui um `.gitignore` para evitar versionar bases brutas gigantes e ambientes virtuais.
-- Se você precisar versionar arquivos grandes (por exemplo `.parquet`), o recomendado é usar Git LFS.
 
 ## Como executar
 
@@ -177,7 +172,6 @@ Os principais parâmetros do pipeline ficam em `src/config/config.yaml`:
 ## Observações
 
 - Este repositório não deve conter dados sensíveis ou identificáveis. Use sempre dados anonimizados/permitidos pela organização do desafio.
-- Se você quiser deixar o repositório mais “leve”, a melhor prática é manter apenas código/config/artefatos essenciais e armazenar datasets/arquivos grandes fora do Git (ou via Git LFS).
 
 ## Troubleshooting rápido
 
@@ -188,5 +182,3 @@ Os principais parâmetros do pipeline ficam em `src/config/config.yaml`:
 | Modelo reclama de colunas | CSV veio com cabeçalho diferente | Gere template a partir de `pred_template.csv` e garanta mesma ordem |
 | Streamlit/uvicorn não iniciam | Porta em uso | Rode com `--server.port 8502` (Streamlit) ou `--port 8001` (Uvicorn) |
 | Métricas fracas | Dados sujos ou leak | Revise colunas vazias, crie features novas, ajuste threshold |
-
-Pronto! Agora você tem um pipeline completo, pensado para ser leve, explicável e fácil de rodar, com todos os alertas de armadilhas comuns. Bons experimentos! 🧪✨
